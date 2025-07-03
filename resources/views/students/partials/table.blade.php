@@ -5,6 +5,8 @@
                 <th>Student ID</th>
                 <th>Name</th>
                 <th>Grade Level</th>
+                <th>Parent Email</th>
+                <th>Parent Phone</th>
                 <th>Actions</th>
             </tr>
         </thead>
@@ -14,6 +16,8 @@
                 <td>{{ $student->student_id }}</td>
                 <td>{{ $student->name }}</td>
                 <td>{{ $student->grade_level }}</td>
+                <td>{{ $student->parent_email }}</td>
+                <td>{{ $student->parent_phone }}</td>
                 <td>
                     <a href="{{ route('students.show', $student->id) }}" class="btn btn-info btn-sm">View Grades</a>
                     <a href="{{ route('grades.create', $student->id) }}" class="btn btn-success btn-sm">Add Grade</a>
@@ -23,6 +27,10 @@
                         <input type="hidden" name="_method" value="DELETE">
                         <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure?');">Delete</button>
                     </form>
+                    <form action="{{ route('students.sendGrades', $student->id) }}" method="POST" style="display:inline;">
+    {{ csrf_field() }}
+    <button type="submit" class="btn btn-sm btn-primary">Send Grades to Parent</button>
+</form>
                 </td>
             </tr>
             @endforeach

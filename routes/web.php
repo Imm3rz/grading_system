@@ -49,3 +49,6 @@ Route::middleware(['auth'])->group(function () {
 
 // Logout
 Route::post('/logout', 'Auth\LoginController@logout')->name('logout');
+
+
+Route::post('/students/{id}/send-grades', 'StudentController@sendGradesToParent')->name('students.sendGrades');

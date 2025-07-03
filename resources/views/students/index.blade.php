@@ -32,6 +32,8 @@
 
     <!-- Students Table Section -->
     <div id="studentsTable">
+        
+
         @include('students.partials.table', ['students' => $students])
     </div>
 </div>

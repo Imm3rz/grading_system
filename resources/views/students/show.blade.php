@@ -19,14 +19,14 @@
                 </tr>
             </thead>
             <tbody>
-                @foreach ($grades as $grade)
+              @foreach ($grades as $grade)
 <tr>
     <td>{{ $grade->subject }}</td>
     <td>{{ $grade->grade }}</td>
     <td>
-        <a href="{{ route('grades.edit', $grade->id) }}" class="btn btn-sm btn-warning">Edit</a>
+        <a href="{{ route('grades.edit', ['student' => $student->id, 'grade' => $grade->id]) }}" class="btn btn-sm btn-warning">Edit</a>
 
-        <form action="{{ route('grades.destroy', $grade->id) }}" method="POST" style="display:inline;">
+        <form action="{{ route('grades.destroy', ['student' => $student->id, 'grade' => $grade->id]) }}" method="POST" style="display:inline;">
             {{ csrf_field() }}
             {{ method_field('DELETE') }}
             <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure?')">Delete</button>
@@ -34,6 +34,7 @@
     </td>
 </tr>
 @endforeach
+
 
             </tbody>
         </table>

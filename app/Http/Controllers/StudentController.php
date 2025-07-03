@@ -56,24 +56,30 @@ class StudentController extends Controller
 
     // Save new student to the database
     // Save new student to the database
-    public function store(Request $request)
-    {
-        $this->validate($request, [
-            'name' => 'required|string|max:255',
-            'grade_level' => 'required|string|max:255',
-        ]);
+   public function store(Request $request)
+{
+    $this->validate($request, [
+        'name' => 'required|string|max:255',
+        'grade_level' => 'required|string|max:255',
+        'parent_email' => 'nullable|email',
+        'parent_phone' => 'nullable|string',
+    ]);
 
-        $student = new Student();
-        $latest = Student::orderBy('id', 'desc')->first();
-        $nextNumber = $latest ? $latest->id + 1 : 1;
-        $student->student_id = 'STD-' . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
-        $student->name = $request->name;
-        $student->grade_level = $request->grade_level;
-        $student->user_id = auth()->id(); // Attach to logged-in user
-        $student->save();
+    $student = new Student();
+    $latest = Student::orderBy('id', 'desc')->first();
+    $nextNumber = $latest ? $latest->id + 1 : 1;
+    $student->student_id = 'STD-' . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
+    $student->name = $request->name;
+    $student->parent_email = $request->parent_email;
+    $student->parent_phone = $request->parent_phone;
+    $student->grade_level = $request->grade_level;
 
-        return redirect()->route('students.index')->with('success', 'Student added successfully.');
-    }
+    $student->user_id = auth()->id(); // Attach to logged-in user
+    $student->save();
+
+    return redirect()->route('students.index')->with('success', 'Student added successfully.');
+}
+
 
 
 
@@ -236,6 +242,75 @@ public function __construct()
 {
     $this->middleware('auth');
 }
+
+public function sendGradesToParent($id)
+{
+    $student = Student::with('grades')->findOrFail($id);
+
+    if (!$student->parent_email) {
+        return back()->with('error', 'No parent email found for this student.');
+    }
+
+    $gradesList = '';
+    foreach ($student->grades as $grade) {
+        $gradesList .= "<li>{$grade->subject}: {$grade->grade}</li>";
+    }
+
+    $postData = [
+        "sender" => [
+            "name" => "NEUST",
+            "email" => "johnemerteamintelligence@gmail.com" // ✅ make sure this is verified in Brevo
+        ],
+        "to" => [
+            [
+                "email" => "johnemermartin@gmail.com",
+                "name" => $student->name . "'s Parent"
+            ]
+        ],
+        "subject" => "Grade Report for " . $student->name,
+        "htmlContent" => "
+            <p>Hello Parent,</p>
+            <p>Here are the grades for <strong>{$student->name}</strong>:</p>
+            <ul>{$gradesList}</ul>
+            <p>Thank you!</p>
+        "
+    ];
+
+    $curl = curl_init();
+    curl_setopt_array($curl, [
+        CURLOPT_URL => "https://api.brevo.com/v3/smtp/email",
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_POST => true,
+        CURLOPT_HTTPHEADER => [
+            "api-key: BanjWN8rkXvVE7tF", // Replace with your actual API key
+            "Content-Type: application/json",
+            "Accept: application/json"
+        ],
+        CURLOPT_POSTFIELDS => json_encode($postData)
+    ]);
+
+    $response = curl_exec($curl);
+    $httpStatus = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+    $error = curl_error($curl);
+    curl_close($curl);
+
+    $responseData = json_decode($response, true);
+
+    if ($error || $httpStatus !== 201) {
+        if (!empty($responseData['message'])) {
+    $message = $responseData['message'];
+} elseif (!empty($error)) {
+    $message = $error;
+} else {
+    $message = 'Unknown error';
+}
+
+        return back()->with('error', 'Failed to send email: ' . $message);
+    }
+
+    return back()->with('success', 'Email sent to parent successfully.');
+}
+
 
 
 }
