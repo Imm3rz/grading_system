@@ -6,7 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class Student extends Model
 {
-    protected $fillable = ['student_id', 'name', 'grade_level'];
+    protected $fillable = ['name', 'grade_level', 'parent_email', 'parent_phone'];
+
 
 
     public function grades()

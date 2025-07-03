@@ -28,7 +28,8 @@
                         <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure?');">Delete</button>
                     </form>
                     <form action="{{ route('students.sendGrades', $student->id) }}" method="POST" style="display:inline;">
-    {{ csrf_field() }}
+    <input type="hidden" name="_token" value="{{ csrf_token() }}">
+
     <button type="submit" class="btn btn-sm btn-primary">Send Grades to Parent</button>
 </form>
                 </td>

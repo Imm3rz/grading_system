@@ -5,6 +5,11 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Http\Request;
 use App\Student;
 use App\Grade;
+require_once base_path('vendor/autoload.php');
+
+use Brevo\Client\Configuration;
+use Brevo\Client\Api\TransactionalEmailsApi;
+use Brevo\Client\Model\SendSmtpEmail;
 
 
 class StudentController extends Controller
@@ -106,8 +111,8 @@ class StudentController extends Controller
     public function storeGrade(Request $request, $id)
 {
     $validator = Validator::make($request->all(), [
-        'subject' => 'required|string|max:255',
-        'grade' => 'required|numeric|min:0|max:100',
+        'grades' => 'required|array',
+        'grades.*' => 'required|numeric|min:0|max:100',
     ]);
 
     if ($validator->fails()) {
@@ -116,14 +121,17 @@ class StudentController extends Controller
             ->withInput();
     }
 
-    Grade::create([
-        'student_id' => $id,
-        'subject' => $request->subject,
-        'grade' => $request->grade,
-    ]);
+    foreach ($request->grades as $subject => $grade) {
+        Grade::create([
+            'student_id' => $id,
+            'subject' => $subject,
+            'grade' => $grade,
+        ]);
+    }
 
-    return redirect()->route('students.show', $id)->with('success', 'Grade added.');
+    return redirect()->route('students.show', $id)->with('success', 'Grades added.');
 }
+
 
 
 // Show form to edit a student
@@ -137,22 +145,28 @@ public function edit($id)
 public function update(Request $request, $id)
 {
     $validator = \Validator::make($request->all(), [
-    'name' => 'required|string|max:255',
-    'grade_level' => 'required|string|max:255',
-]);
+        'name' => 'required|string|max:255',
+        'grade_level' => 'required|string|max:255',
+        'parent_email' => 'nullable|email',
+        'parent_phone' => 'nullable|string|max:20',
+    ]);
 
-if ($validator->fails()) {
-    return redirect()->back()
-        ->withErrors($validator)
-        ->withInput();
-}
-
+    if ($validator->fails()) {
+        return redirect()->back()
+            ->withErrors($validator)
+            ->withInput();
+    }
 
     $student = Student::findOrFail($id);
-    $student->update($request->all());
+    $student->name = $request->name;
+    $student->grade_level = $request->grade_level;
+    $student->parent_email = $request->parent_email;
+    $student->parent_phone = $request->parent_phone;
+    $student->save();
 
     return redirect()->route('students.index')->with('success', 'Student updated successfully.');
 }
+
 
 // Delete student
 public function destroy($id)
@@ -173,13 +187,12 @@ public function gradeLookupForm()
 public function gradeLookup(Request $request)
 {
     $validator = \Validator::make($request->all(), [
-    'student_id' => 'required|string',
-]);
+        'student_id' => 'required|string',
+    ]);
 
-if ($validator->fails()) {
-    return redirect()->back()->withErrors($validator)->withInput();
-}
-
+    if ($validator->fails()) {
+        return redirect()->back()->withErrors($validator)->withInput();
+    }
 
     $student = Student::where('student_id', $request->student_id)->first();
 
@@ -187,33 +200,41 @@ if ($validator->fails()) {
         return back()->with('error', 'Student ID not found.');
     }
 
-    // Fetch grades
     $grades = $student->grades;
     $average = $grades->avg('grade');
     $remark = $average >= 75 ? 'Passed' : 'Failed';
 
-    // Add to session (recently viewed)
+    // ✅ Add to session (recently viewed)
     $recent = session()->get('recent_students', []);
-    $recent[$student->id] = [
+
+    // Remove duplicates by ID
+    $recent = array_filter($recent, function ($entry) use ($student) {
+        return $entry['id'] !== $student->id;
+    });
+
+    // Add to the end
+    $recent[] = [
         'id' => $student->id,
         'student_id' => $student->student_id,
         'name' => $student->name,
-        'grade_level' => $student->grade_level
+        'grade_level' => $student->grade_level,
+        'source' => 'internal' // optional tag for your logic
     ];
-    $recent = array_slice($recent, -5, true); // max 5
+
+    // Keep only last 5
+    $recent = array_slice($recent, -5);
+
     session()->put('recent_students', $recent);
 
     return view('students.result', compact('student', 'grades', 'average', 'remark'));
 }
 
-
-// Public grade lookup form
+// ✅ Public grade checker (no login required)
 public function publicGradeLookupForm()
 {
     return view('public.lookup');
 }
 
-// Public grade lookup handler
 public function publicGradeLookup(Request $request)
 {
     $validator = \Validator::make($request->all(), [
@@ -234,8 +255,33 @@ public function publicGradeLookup(Request $request)
     $average = $grades->avg('grade');
     $remark = $average >= 75 ? 'Passed' : 'Failed';
 
+    // ✅ Add to session (visible to teachers)
+    $recent = session()->get('recent_students', []);
+
+    // Remove duplicates by ID
+    $recent = array_filter($recent, function ($entry) use ($student) {
+        return $entry['id'] !== $student->id;
+    });
+
+    // Add to the end
+    $recent[] = [
+        'id' => $student->id,
+        'student_id' => $student->student_id,
+        'name' => $student->name,
+        'grade_level' => $student->grade_level,
+        'source' => 'public' // tag it as public view
+    ];
+
+    // Keep only last 5
+    $recent = array_slice($recent, -5);
+
+    session()->put('recent_students', $recent);
+
     return view('public.result', compact('student', 'grades', 'average', 'remark'));
 }
+
+
+
 
 
 public function __construct()
@@ -251,65 +297,55 @@ public function sendGradesToParent($id)
         return back()->with('error', 'No parent email found for this student.');
     }
 
+    // Build the grades list
     $gradesList = '';
     foreach ($student->grades as $grade) {
-        $gradesList .= "<li>{$grade->subject}: {$grade->grade}</li>";
+        $gradesList .= "<li>" . htmlspecialchars($grade->subject) . ": " . htmlspecialchars($grade->grade) . "</li>";
     }
 
-    $postData = [
-        "sender" => [
-            "name" => "NEUST",
-            "email" => "johnemerteamintelligence@gmail.com" // ✅ make sure this is verified in Brevo
-        ],
-        "to" => [
-            [
-                "email" => "johnemermartin@gmail.com",
-                "name" => $student->name . "'s Parent"
-            ]
-        ],
+    // Email HTML body
+    $html = "<p>Hello Parent,</p>
+             <p>Here are the grades for <strong>" . htmlspecialchars($student->name) . "</strong>:</p>
+             <ul>" . $gradesList . "</ul>
+             <p>Thank you!</p>";
+
+    // Prepare cURL request
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, 'https://api.resend.com/emails');
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, array(
+        'Authorization: Bearer re_AoEF9Lt3_CDEfQMYkaTzqnvzFSQbYdxGQ',
+        'Content-Type: application/json'
+    ));
+
+    $postData = array(
+        "from" => "onboarding@resend.dev",
+        "to" => $student->parent_email, // use actual parent email here
         "subject" => "Grade Report for " . $student->name,
-        "htmlContent" => "
-            <p>Hello Parent,</p>
-            <p>Here are the grades for <strong>{$student->name}</strong>:</p>
-            <ul>{$gradesList}</ul>
-            <p>Thank you!</p>
-        "
-    ];
+        "html" => $html
+    );
 
-    $curl = curl_init();
-    curl_setopt_array($curl, [
-        CURLOPT_URL => "https://api.brevo.com/v3/smtp/email",
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_POST => true,
-        CURLOPT_HTTPHEADER => [
-            "api-key: BanjWN8rkXvVE7tF", // Replace with your actual API key
-            "Content-Type: application/json",
-            "Accept: application/json"
-        ],
-        CURLOPT_POSTFIELDS => json_encode($postData)
-    ]);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($postData));
 
-    $response = curl_exec($curl);
-    $httpStatus = curl_getinfo($curl, CURLINFO_HTTP_CODE);
-    $error = curl_error($curl);
-    curl_close($curl);
+    // Trust SSL cert (fix for PHP 5.6)
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+    curl_setopt($ch, CURLOPT_CAINFO, "C:\\xampp 5.6\\php\\extras\\ssl\\cacert.pem"); // Make sure this path is correct
 
-    $responseData = json_decode($response, true);
+    $response = curl_exec($ch);
+    $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $error = curl_error($ch);
+    curl_close($ch);
 
-    if ($error || $httpStatus !== 201) {
-        if (!empty($responseData['message'])) {
-    $message = $responseData['message'];
-} elseif (!empty($error)) {
-    $message = $error;
-} else {
-    $message = 'Unknown error';
-}
-
-        return back()->with('error', 'Failed to send email: ' . $message);
+    if ($status !== 200) {
+        return back()->with('error', 'Failed to send email. cURL error: ' . $error . ' | HTTP Code: ' . $status);
     }
 
     return back()->with('success', 'Email sent to parent successfully.');
 }
+
+
+
 
 
 

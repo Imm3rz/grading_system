@@ -9,6 +9,7 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
     <title>{{ config('app.name', 'Class') }}</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <!-- Styles -->
     <link href="{{ asset('css/app.css') }}" rel="stylesheet">
@@ -27,7 +28,7 @@
         <!-- Sidebar -->
         <aside id="sidebar" class="h-screen w-96 bg-white text-gray-800 shadow-md p-4 md:block fixed md:relative z-50 transition-all duration-300">
             <div class="flex items-center p-4 space-x-4">
-                <img src="https://source.unsplash.com/100x100/?portrait" alt="" class="w-16 h-16 rounded-full">
+                <img src="https://cdn-icons-png.flaticon.com/512/3135/3135715.png" alt="" class="w-16 h-16 rounded-full">
                 <div>
                     <h2 class="text-2xl font-bold">{{ Auth::check() ? Auth::user()->name : 'Guest' }}</h2>
                     <span class="text-sm text-gray-600"><a href="#" class="hover:underline">View profile</a></span>
@@ -60,41 +61,11 @@
             <span class="no-underline text-3xl">Grades Check</span>
         </a>
     </li>
-    <li>
-        <a href="#"
-           class="flex items-center px-3 py-6 space-x-4 rounded-md transition
-               hover:bg-blue-100 text-gray-800">
-            <span class="text-2xl">💬</span>
-            <span class="no-underline text-3xl">Chat</span>
-        </a>
-    </li>
-    <li>
-        <a href="#"
-           class="flex items-center px-3 py-6 space-x-4 rounded-md transition
-               hover:bg-blue-100 text-gray-800">
-            <span class="text-2xl">📝</span>
-            <span class="no-underline text-3xl">Orders</span>
-        </a>
-    </li>
-    <li>
-        <a href="#"
-           class="flex items-center px-3 py-6 space-x-4 rounded-md transition
-               hover:bg-blue-100 text-gray-800">
-            <span class="text-2xl">❤️</span>
-            <span class="no-underline text-3xl">Wishlist</span>
-        </a>
-    </li>
+    
 </ul>
 
 <ul class="pt-5 space-y-2 text-lg font-medium">
-    <li>
-        <a href="#"
-           class="flex items-center px-3 py-6 space-x-4 rounded-md transition
-               hover:bg-blue-100 text-gray-800">
-            <span class="text-2xl">⚙️</span>
-            <span class="no-underline text-3xl">Settings</span>
-        </a>
-    </li>
+    
     <li>
         <a href="{{ route('logout') }}"
            onclick="event.preventDefault(); document.getElementById('logout-form').submit();"

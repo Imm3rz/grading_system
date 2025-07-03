@@ -10,31 +10,51 @@ use DB;
 class DashboardController extends Controller
 {
     public function index()
-    {
-        $totalStudents = Student::count();
-        $totalGrades = Grade::count();
-        $averageGrade = Grade::avg('grade');
+{
+    $teacherId = auth()->id(); // If you're assigning students per teacher
 
-        $passedStudents = 0;
-        $failedStudents = 0;
+    $students = Student::where('user_id', $teacherId)->with('grades')->get();
 
-        // Count passed/failed students by averaging their grades
-        $students = Student::with('grades')->get();
-        foreach ($students as $student) {
-            $avg = $student->grades->avg('grade');
+    $totalStudents = $students->count();
+    $totalGrades = 0;
+    $gradeSum = 0;
+    $passedStudents = 0;
+    $failedStudents = 0;
+
+    $studentNames = [];
+    $averageGrades = [];
+
+    foreach ($students as $student) {
+        $grades = $student->grades;
+        $count = $grades->count();
+
+        if ($count > 0) {
+            $avg = $grades->avg('grade');
+            $gradeSum += $grades->sum('grade');
+            $totalGrades += $count;
+
+            $studentNames[] = $student->name;
+            $averageGrades[] = round($avg, 2);
+
             if ($avg >= 75) {
                 $passedStudents++;
             } else {
                 $failedStudents++;
             }
         }
-
-        return view('dashboard.index', compact(
-            'totalStudents',
-            'totalGrades',
-            'averageGrade',
-            'passedStudents',
-            'failedStudents'
-        ));
     }
+
+    $averageGrade = $totalGrades > 0 ? $gradeSum / $totalGrades : 0;
+
+    return view('dashboard.index', compact(
+        'totalStudents',
+        'totalGrades',
+        'averageGrade',
+        'passedStudents',
+        'failedStudents',
+        'studentNames',
+        'averageGrades'
+    ));
+}
+
 }

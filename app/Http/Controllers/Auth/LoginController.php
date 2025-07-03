@@ -23,7 +23,7 @@ class LoginController extends Controller
         return redirect('/students');
     }
 
-    return view('auth.login'); // Replace with your view if it's named differently
+    return view('auth.login'); 
 }
 
 }

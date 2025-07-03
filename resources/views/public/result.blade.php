@@ -30,7 +30,7 @@
         <p><strong>Average:</strong> {{ round($average, 2) }}</p>
         <p><strong>Remark:</strong> {{ $remark }}</p>
 
-        <a href="{{ url('/check/grades') }}" class="mt-6 inline-block text-blue-500 hover:underline">Check another student</a>
+        <a href="{{ url('report-card') }}" class="mt-6 inline-block text-blue-500 hover:underline">Check another student</a>
     </div>
 </body>
 </html>
